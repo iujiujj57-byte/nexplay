@@ -28,39 +28,11 @@ const sites = [
     description: "Puzzles, strategy and casual games."
   },
   {
-    name: "GitHub Games",
-    url: "https://githubgames.gitlab.io/",
-    category: "community",
-    icon: "◉",
-    description: "A collection of game links and projects."
-  },
-  {
-    name: "GitLab Games",
-    url: "https://gitlabgames.gitlab.io/",
-    category: "community",
-    icon: "🔺",
-    description: "Browse game projects hosted on GitLab."
-  },
-  {
     name: "Velara",
     url: "http://velara.cc",
     category: "games",
     icon: "V",
     description: "An external gaming link from your collection."
-  },
-  {
-    name: "DaydreamX",
-    url: "https://daydreamx.pro/app/index.html",
-    category: "games",
-    icon: "🌙",
-    description: "An external site to explore."
-  },
-  {
-    name: "55Gms",
-    url: "https://55gms.com/",
-    category: "games",
-    icon: "55",
-    description: "A browser game link from your collection."
   },
   {
     name: "Orchid Idea",
@@ -89,14 +61,42 @@ const sites = [
     category: "other",
     icon: "SVG",
     description: "An SVG file link, not a standard game page."
-  }
-    {
-    name: "Site Name",
-    url: "https://github.com/iujiujj57-byte/nexplay/edit/main/script.js,
-    category: "games",
-    icon: "🎯",
-    description: "A short description of the site."
   },
+  {
+    name: "Games Unblocked",
+    url: "https://games-unblocked.org/",
+    category: "games",
+    icon: "🎮",
+    description: "A big portal of free browser games by genre."
+  },
+  {
+    name: "Radon Games",
+    url: "https://mathclass.vercel.app/",
+    category: "games",
+    icon: "☢️",
+    description: "An open-source unblocked games site."
+  },
+  {
+    name: "Unblocked Gaming",
+    url: "https://bio.link/unblockedgaming",
+    category: "community",
+    icon: "🔗",
+    description: "A link page of games and mirror sites."
+  },
+  {
+    name: "Equinox",
+    url: "https://searchequinox.com/",
+    category: "games",
+    icon: "🌗",
+    description: "Games and apps portal. Free to use; skip the paid tier."
+  },
+  {
+    name: "PeteZah",
+    url: "https://999hourly.cfd/",
+    category: "other",
+    icon: "🎯",
+    description: "A games page behind a quick verify screen."
+  }
 ];
 
 const grid = document.querySelector("#siteGrid");
