@@ -90,6 +90,13 @@ const sites = [
     icon: "SVG",
     description: "An SVG file link, not a standard game page."
   }
+    {
+    name: "Site Name",
+    url: "https://github.com/iujiujj57-byte/nexplay/edit/main/script.js,
+    category: "games",
+    icon: "🎯",
+    description: "A short description of the site."
+  },
 ];
 
 const grid = document.querySelector("#siteGrid");
