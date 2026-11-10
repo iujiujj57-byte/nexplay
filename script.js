@@ -250,3 +250,172 @@ document.addEventListener("keydown", event => {
 });
 
 renderSites();
+
+
+// ---- Chat ----
+// Paste these two values from your Firebase project (see the setup steps).
+const CHAT_DB = "";      // Realtime Database URL, e.g. "https://your-project-default-rtdb.firebaseio.com"
+const CHAT_API_KEY = ""; // Web API key from Firebase Project settings
+(function () {
+  const $ = s => document.querySelector(s);
+  const navChat = $("#navChat"), list = $("#chatList"), note = $("#chatNote");
+  const authForm = $("#chatAuth"), authNote = $("#authNote"), main = $("#chatMain"), who = $("#chatWho");
+  const form = $("#chatForm"), msgIn = $("#chatMsg");
+  const home = document.querySelector('.side-nav a[href="#home"]');
+  const db = CHAT_DB.replace(/\/$/, "");
+  const ready = !!(db && CHAT_API_KEY);
+  let timer = null, lastSent = 0, session = null;
+
+  function store(k, v) {
+    try {
+      if (v === undefined) return localStorage.getItem(k);
+      if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v);
+    } catch (e) { return null; }
+  }
+  function showNote(el, t) { el.textContent = t; el.hidden = !t; }
+  function saveSession() { store("np_session", JSON.stringify({ r: session.refreshToken, u: session.uid, n: session.name })); }
+
+  async function authCall(path, body) {
+    const r = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:" + path + "?key=" + CHAT_API_KEY, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error((d.error && d.error.message) || "ERROR");
+    return d;
+  }
+  async function refresh() {
+    const r = await fetch("https://securetoken.googleapis.com/v1/token?key=" + CHAT_API_KEY, {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "grant_type=refresh_token&refresh_token=" + encodeURIComponent(session.refreshToken)
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error("expired");
+    session.idToken = d.id_token;
+    session.refreshToken = d.refresh_token;
+    session.exp = Date.now() + (Number(d.expires_in) - 60) * 1000;
+    saveSession();
+  }
+  async function token() {
+    if (Date.now() >= session.exp) await refresh();
+    return session.idToken;
+  }
+  function friendly(m) {
+    if (/EMAIL_EXISTS/.test(m)) return "That username is taken.";
+    if (/INVALID_LOGIN|EMAIL_NOT_FOUND|INVALID_PASSWORD/.test(m)) return "Wrong username or password.";
+    if (/WEAK_PASSWORD/.test(m)) return "Password needs 6 or more characters.";
+    if (/TOO_MANY/.test(m)) return "Too many tries. Wait a bit.";
+    if (/OPERATION_NOT_ALLOWED/.test(m)) return "Email/password sign-in isn’t turned on in Firebase.";
+    return "Couldn’t sign in. Try again.";
+  }
+
+  function updateView() {
+    authForm.hidden = !!session;
+    main.hidden = !session;
+    who.textContent = session ? "Signed in as " + session.name : "Sign in to chat";
+  }
+  function render(msgs) {
+    const stick = list.scrollTop + list.clientHeight >= list.scrollHeight - 30;
+    list.replaceChildren();
+    for (const m of msgs) {
+      const row = document.createElement("div");
+      row.className = "chat-msg";
+      const name = document.createElement("b");
+      name.textContent = String(m.n || "?").slice(0, 20);
+      row.append(name, document.createTextNode(String(m.m || "").slice(0, 200)));
+      list.append(row);
+    }
+    if (stick) list.scrollTop = list.scrollHeight;
+  }
+  function signOut() {
+    session = null;
+    store("np_session", null);
+    clearInterval(timer);
+    list.replaceChildren();
+    showNote(note, "");
+    updateView();
+  }
+  async function load() {
+    if (!session) return;
+    try {
+      const r = await fetch(db + '/messages.json?orderBy="t"&limitToLast=100&auth=' + encodeURIComponent(await token()));
+      if (!r.ok) throw new Error("bad");
+      const d = (await r.json()) || {};
+      render(Object.values(d).sort((a, b) => a.t - b.t));
+      showNote(note, "");
+    } catch (e) {
+      if (e.message === "expired") signOut(); else showNote(note, "Chat is offline right now.");
+    }
+  }
+  function poll() {
+    clearInterval(timer);
+    if (session && document.body.classList.contains("show-chat")) {
+      load();
+      timer = setInterval(() => { if (!document.hidden) load(); }, 4000);
+    }
+  }
+  function setOpen(open) {
+    document.body.classList.toggle("show-chat", open);
+    navChat.classList.toggle("selected", open);
+    if (open) home.classList.remove("selected");
+    else if (!document.querySelector(".side-nav .selected")) home.classList.add("selected");
+    if (open && !ready) { authForm.hidden = false; main.hidden = true; showNote(authNote, "Chat isn’t set up yet."); }
+    poll();
+    if (open) (session ? msgIn : $("#authUser")).focus();
+  }
+
+  async function enter(kind) {
+    showNote(authNote, "");
+    if (!ready) { showNote(authNote, "Chat isn’t set up yet."); return; }
+    const name = $("#authUser").value.trim().toLowerCase(), pass = $("#authPass").value;
+    if (!/^[a-z0-9_]{3,20}$/.test(name)) { showNote(authNote, "Username: 3 to 20 letters, numbers or _."); return; }
+    if (pass.length < 6) { showNote(authNote, "Password needs 6 or more characters."); return; }
+    try {
+      const d = await authCall(kind === "up" ? "signUp" : "signInWithPassword", { email: name + "@nexplay.chat", password: pass, returnSecureToken: true });
+      session = { uid: d.localId, name: name, idToken: d.idToken, refreshToken: d.refreshToken, exp: Date.now() + (Number(d.expiresIn) - 60) * 1000 };
+      saveSession();
+      if (kind === "up") {
+        const r = await fetch(db + "/users/" + session.uid + ".json?auth=" + encodeURIComponent(session.idToken), { method: "PUT", body: JSON.stringify({ name: name }) });
+        if (!r.ok) throw new Error("db");
+      }
+      $("#authPass").value = "";
+      updateView();
+      poll();
+    } catch (e) {
+      if (e.message === "db") { session = null; store("np_session", null); showNote(authNote, "Account made, but the database rules block it. Check the setup steps."); }
+      else showNote(authNote, friendly(e.message));
+    }
+  }
+
+  navChat.addEventListener("click", () => setOpen(true));
+  document.querySelectorAll(".side-nav .nav-link:not(#navChat)").forEach(el => el.addEventListener("click", () => setOpen(false)));
+  authForm.addEventListener("submit", e => { e.preventDefault(); enter("in"); });
+  $("#authUp").addEventListener("click", () => enter("up"));
+  $("#chatOut").addEventListener("click", signOut);
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const m = msgIn.value.trim().slice(0, 200);
+    if (!m || !session) return;
+    if (Date.now() - lastSent < 3000) { showNote(note, "Slow down a little."); return; }
+    lastSent = Date.now();
+    try {
+      const r = await fetch(db + "/messages.json?auth=" + encodeURIComponent(await token()), {
+        method: "POST", body: JSON.stringify({ n: session.name, u: session.uid, m: m, t: { ".sv": "timestamp" } })
+      });
+      if (!r.ok) throw new Error("bad");
+      msgIn.value = "";
+      load();
+    } catch (err) { showNote(note, "Couldn’t send. Try again."); }
+  });
+
+  (async function init() {
+    updateView();
+    if (!ready) return;
+    let s = null;
+    try { s = JSON.parse(store("np_session") || "null"); } catch (e) {}
+    if (!s) return;
+    session = { uid: s.u, name: s.n, refreshToken: s.r, idToken: "", exp: 0 };
+    try { await refresh(); } catch (e) { session = null; store("np_session", null); }
+    updateView();
+    poll();
+  })();
+})();
