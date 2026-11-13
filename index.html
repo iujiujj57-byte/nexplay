@@ -1,16 +1,32 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#08090b">
-  <meta name="description" content="A clean, monochrome directory for your browser game links.">
+  <meta name="description" content="A clean directory for browser game websites.">
   <title>NexPlay — Your Game Links, One Place</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="style.css">
-  
+  <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="auth-loading">
+
+  <div id="accessGate" class="access-gate">
+    <div class="access-card">
+      <div class="access-logo">🎮</div>
+      <p class="access-eyebrow">NEXPLAY SECURITY</p>
+      <h1>Welcome to NexPlay</h1>
+      <p>Choose a display name to continue.</p>
+      <form id="usernameForm">
+        <input id="usernameInput" type="text" minlength="2" maxlength="20"
+          placeholder="Your display name" autocomplete="nickname" required>
+        <button type="submit">Continue →</button>
+      </form>
+      <p id="gateMessage" class="access-message">Your name will be visible to the NexPlay administrator.</p>
+    </div>
+  </div>
+
   <aside class="sidebar">
     <a class="brand" href="#" aria-label="NexPlay home">
       <span class="brand-mark">🎮</span>
@@ -50,7 +66,7 @@
         <h1>Your Next Game<br><span>Awaits.</span></h1>
         <p>A collection of browser game websites, all in one place. Easy to browse, easy to open.</p>
         <div class="hero-stats">
-          <div><strong id="heroCount">13+</strong><span>Saved Links</span></div>
+          <div><strong id="heroCount">14 Links</strong><span>Saved Links</span></div>
           <div><strong>One Place</strong><span>Easy Access</span></div>
           <div><strong>Zero Fuss</strong><span>Just Click &amp; Go</span></div>
         </div>
@@ -65,7 +81,7 @@
     <section class="directory" id="sites">
       <div class="section-heading">
         <div><span class="eyebrow muted">THE COLLECTION</span><h2>Explore Sites<span class="period">.</span></h2></div>
-        <span id="resultCount" class="result-count">13 sites</span>
+        <span id="resultCount" class="result-count">14 sites</span>
       </div>
 
       <div class="filter-row" id="filters" aria-label="Filter sites">
@@ -89,8 +105,47 @@
       <span class="banner-mark">N / P</span>
     </section>
 
-    <footer><span>© <span id="year"></span> NexPlay</span><span>YOUR GAME LINKS. ONE PLACE.</span><a href="#home">Back to top ↑</a></footer>
+    <footer>
+      <span>© <span id="year"></span> NexPlay</span>
+      <span>YOUR GAME LINKS. ONE PLACE.</span>
+      <button id="adminOpen" class="admin-open">Administrator</button>
+      <a href="#home">Back to top ↑</a>
+    </footer>
   </main>
-<script src="script.js"></script>
+
+  <!-- Administrator panel -->
+  <div id="adminModal" class="admin-modal" hidden>
+    <div class="admin-card">
+      <div class="admin-heading">
+        <div>
+          <p class="access-eyebrow">NEXPLAY CONTROL PANEL</p>
+          <h2>Administrator</h2>
+        </div>
+        <button id="adminClose" class="modal-close" aria-label="Close">×</button>
+      </div>
+
+      <form id="adminLoginForm">
+        <label for="adminEmail">Administrator email</label>
+        <input id="adminEmail" type="email" value="arehq@schools.vic.edu.au" autocomplete="username" required>
+        <label for="adminPassword">Password</label>
+        <input id="adminPassword" type="password" placeholder="Your administrator password" autocomplete="current-password" required>
+        <button type="submit">Sign in →</button>
+        <p id="adminMessage" class="access-message"></p>
+      </form>
+
+      <div id="adminDashboard" hidden>
+        <div class="admin-toolbar">
+          <p>Registered visitors: <strong id="visitorCount">0</strong></p>
+          <button id="adminRefresh" class="secondary-button">Refresh</button>
+        </div>
+        <label for="banReason">Reason for ban</label>
+        <input id="banReason" type="text" maxlength="200" value="Violation of rules">
+        <div id="visitorList" class="visitor-list"></div>
+        <button id="adminSignOut" class="admin-signout">Sign out</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="script.js"></script>
 </body>
 </html>
