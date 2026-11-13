@@ -1,11 +1,55 @@
 
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js";
+
+import {
+  getAuth,
+  signInAnonymously,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut,
+  sendEmailVerification
+} from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
+
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  deleteDoc,
+  collection,
+  getDocs,
+  serverTimestamp,
+  onSnapshot
+} from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
+
+// YOUR NEXPLAY FIREBASE PROJECT
+const firebaseConfig = {
+  apiKey: "AIzaSyCz7gweuP0E9-jO-uXjbyXMOlWeIHT4Bn8",
+  authDomain: "nexplay-1029b.firebaseapp.com",
+  projectId: "nexplay-1029b",
+  storageBucket: "nexplay-1029b.firebasestorage.app",
+  messagingSenderId: "288990411835",
+  appId: "1:288990411835:web:f1a0697b6c4042fd3eb01e",
+  measurementId: "G-7DKFNYY8L9"
+};
+
+const ADMIN_EMAIL = "arehq@schools.vic.edu.au";
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// -----------------------------
+// GAME LINKS
+// -----------------------------
+
 const sites = [
   {
     name: "Radon Games",
     url: "https://mathclass.vercel.app/",
     category: "games",
     icon: "☢️",
-    description: "An open-source unblocked games site."
+    description: "An open-source browser games site."
   },
   {
     name: "Classic HTML5 Games",
@@ -100,19 +144,44 @@ const sites = [
   }
 ];
 
+// -----------------------------
+// PAGE ELEMENTS
+// -----------------------------
+
 const grid = document.querySelector("#siteGrid");
 const search = document.querySelector("#search");
 const emptyState = document.querySelector("#emptyState");
 const resultCount = document.querySelector("#resultCount");
 const filterButtons = [...document.querySelectorAll("[data-filter]")];
 
+const accessGate = document.querySelector("#accessGate");
+const usernameForm = document.querySelector("#usernameForm");
+const usernameInput = document.querySelector("#usernameInput");
+const gateMessage = document.querySelector("#gateMessage");
+
+const adminModal = document.querySelector("#adminModal");
+const adminOpen = document.querySelector("#adminOpen");
+const adminClose = document.querySelector("#adminClose");
+const adminLoginForm = document.querySelector("#adminLoginForm");
+const adminDashboard = document.querySelector("#adminDashboard");
+const adminMessage = document.querySelector("#adminMessage");
+const visitorList = document.querySelector("#visitorList");
+
 let activeFilter = "all";
+let currentUser = null;
+let currentUsername = "";
+let isAdmin = false;
+let banListener = null;
 
 const categoryNames = {
   games: "Game Hub",
   community: "Community",
   other: "Other"
 };
+
+// -----------------------------
+// GAME DIRECTORY
+// -----------------------------
 
 function safeHost(url) {
   try {
@@ -146,12 +215,10 @@ function renderSites() {
 
     const icon = document.createElement("div");
     icon.className = "site-icon";
-    icon.setAttribute("aria-hidden", "true");
     icon.textContent = site.icon;
 
     const external = document.createElement("span");
     external.className = "external-mark";
-    external.setAttribute("aria-hidden", "true");
     external.textContent = "↗";
 
     top.append(icon, external);
@@ -171,19 +238,7 @@ function renderSites() {
     link.href = site.url;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-
-    link.append(
-      document.createTextNode("Open Website "),
-      Object.assign(document.createElement("span"), {
-        textContent: "→",
-        "aria-hidden": "true"
-      })
-    );
-
-    link.setAttribute(
-      "aria-label",
-      `Open ${site.name} in a new tab`
-    );
+    link.textContent = "Open Website →";
 
     card.append(top, title, tag, description, link);
     grid.append(card);
@@ -200,12 +255,11 @@ function setFilter(filter) {
   activeFilter = filter;
 
   filterButtons.forEach(button => {
-    const isActive = button.dataset.filter === filter;
-
-    button.classList.toggle("active", isActive);
+    const selected = button.dataset.filter === filter;
+    button.classList.toggle("active", selected);
 
     if (button.classList.contains("filter-chip")) {
-      button.setAttribute("aria-pressed", String(isActive));
+      button.setAttribute("aria-pressed", String(selected));
     }
   });
 
@@ -246,10 +300,7 @@ document.querySelector("#resetFilters").addEventListener("click", () => {
 });
 
 document.addEventListener("keydown", event => {
-  if (
-    (event.ctrlKey || event.metaKey) &&
-    event.key.toLowerCase() === "k"
-  ) {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
     event.preventDefault();
     search.focus();
   }
@@ -262,3 +313,317 @@ document.addEventListener("keydown", event => {
 });
 
 renderSites();
+
+// -----------------------------
+// VISITOR ACCESS
+// -----------------------------
+
+function hideGate() {
+  accessGate.hidden = true;
+  document.body.classList.remove("auth-loading");
+}
+
+function showGate(message) {
+  accessGate.hidden = false;
+  document.body.classList.add("auth-loading");
+
+  if (message) {
+    gateMessage.textContent = message;
+  }
+}
+
+function stopBanListener() {
+  if (banListener) {
+    banListener();
+    banListener = null;
+  }
+}
+
+function redirectToBanPage() {
+  window.location.replace("banned.html");
+}
+
+async function checkVisitor(user) {
+  currentUser = user;
+
+  const banRef = doc(db, "bannedUsers", user.uid);
+  const banSnapshot = await getDoc(banRef);
+
+  if (banSnapshot.exists()) {
+    redirectToBanPage();
+    return;
+  }
+
+  stopBanListener();
+
+  banListener = onSnapshot(banRef, snapshot => {
+    if (snapshot.exists()) {
+      redirectToBanPage();
+    }
+  });
+
+  const profileRef = doc(db, "profiles", user.uid);
+  const profileSnapshot = await getDoc(profileRef);
+
+  if (!profileSnapshot.exists()) {
+    showGate("Choose a display name to continue.");
+    return;
+  }
+
+  currentUsername = profileSnapshot.data().username || "Visitor";
+  hideGate();
+}
+
+usernameForm.addEventListener("submit", async event => {
+  event.preventDefault();
+
+  if (!currentUser || isAdmin) return;
+
+  const username = usernameInput.value.trim();
+
+  if (username.length < 2 || username.length > 20) {
+    gateMessage.textContent = "Your name must be between 2 and 20 characters.";
+    return;
+  }
+
+  try {
+    gateMessage.textContent = "Saving your name...";
+
+    await setDoc(doc(db, "profiles", currentUser.uid), {
+      username,
+      createdAt: serverTimestamp()
+    });
+
+    currentUsername = username;
+    hideGate();
+  } catch (error) {
+    console.error(error);
+    gateMessage.textContent =
+      "Couldn't save your name. Please try again.";
+  }
+});
+
+// -----------------------------
+// FIREBASE AUTHENTICATION
+// -----------------------------
+
+onAuthStateChanged(auth, async user => {
+  try {
+    if (!user) {
+      isAdmin = false;
+      stopBanListener();
+
+      await signInAnonymously(auth);
+      return;
+    }
+
+    if (user.email) {
+      if (
+        user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() &&
+        user.emailVerified
+      ) {
+        stopBanListener();
+        isAdmin = true;
+        currentUser = user;
+
+        hideGate();
+        adminLoginForm.hidden = true;
+        adminDashboard.hidden = false;
+
+        await loadVisitors();
+        return;
+      }
+
+      // Only the designated administrator email is accepted here.
+      isAdmin = false;
+      await signOut(auth);
+      return;
+    }
+
+    isAdmin = false;
+    await checkVisitor(user);
+
+  } catch (error) {
+    console.error("Authentication error:", error);
+    showGate("Couldn't connect to NexPlay. Check your internet and reload.");
+  }
+});
+
+// -----------------------------
+// ADMIN PANEL
+// -----------------------------
+
+function openAdmin() {
+  adminModal.hidden = false;
+
+  if (isAdmin) {
+    adminLoginForm.hidden = true;
+    adminDashboard.hidden = false;
+    loadVisitors();
+  } else {
+    adminLoginForm.hidden = false;
+    adminDashboard.hidden = true;
+  }
+}
+
+function closeAdmin() {
+  adminModal.hidden = true;
+}
+
+adminOpen.addEventListener("click", openAdmin);
+adminClose.addEventListener("click", closeAdmin);
+
+adminModal.addEventListener("click", event => {
+  if (event.target === adminModal) closeAdmin();
+});
+
+adminLoginForm.addEventListener("submit", async event => {
+  event.preventDefault();
+
+  const email = document.querySelector("#adminEmail").value.trim();
+  const password = document.querySelector("#adminPassword").value;
+
+  if (email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+    adminMessage.textContent = "That email is not the administrator email.";
+    return;
+  }
+
+  try {
+    adminMessage.textContent = "Signing in...";
+
+    const credential = await signInWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+
+    if (!credential.user.emailVerified) {
+      await sendEmailVerification(credential.user);
+      await signOut(auth);
+
+      adminMessage.textContent =
+        "Your email isn't verified. We've sent a verification email. Verify it, then sign in again.";
+
+      return;
+    }
+
+    adminMessage.textContent = "Signed in successfully.";
+
+  } catch (error) {
+    console.error(error);
+    adminMessage.textContent =
+      "Sign-in failed. Check your email and password.";
+  }
+});
+
+// -----------------------------
+// LOAD VISITORS
+// -----------------------------
+
+async function loadVisitors() {
+  if (!isAdmin) return;
+
+  visitorList.textContent = "Loading visitors...";
+
+  try {
+    const [profilesSnapshot, bannedSnapshot] = await Promise.all([
+      getDocs(collection(db, "profiles")),
+      getDocs(collection(db, "bannedUsers"))
+    ]);
+
+    const bannedIds = new Set(
+      bannedSnapshot.docs.map(item => item.id)
+    );
+
+    visitorList.replaceChildren();
+
+    document.querySelector("#visitorCount").textContent =
+      profilesSnapshot.size;
+
+    if (profilesSnapshot.empty) {
+      visitorList.textContent = "No visitors have registered yet.";
+      return;
+    }
+
+    profilesSnapshot.forEach(profileDoc => {
+      const uid = profileDoc.id;
+      const profile = profileDoc.data();
+      const banned = bannedIds.has(uid);
+
+      const card = document.createElement("div");
+      card.className = "visitor-card";
+
+      const details = document.createElement("div");
+      details.className = "visitor-details";
+
+      const name = document.createElement("strong");
+      name.textContent = profile.username || "Unnamed visitor";
+
+      const id = document.createElement("small");
+      id.textContent = `ID: ${uid}`;
+
+      const status = document.createElement("span");
+      status.className = banned ? "visitor-status banned" : "visitor-status";
+      status.textContent = banned ? "BANNED" : "ACTIVE";
+
+      details.append(name, id, status);
+
+      const action = document.createElement("button");
+      action.className = banned ? "unban-button" : "ban-button";
+      action.textContent = banned ? "Unban" : "Ban";
+
+      action.addEventListener("click", async () => {
+        if (!isAdmin) return;
+
+        action.disabled = true;
+
+        try {
+          const banRef = doc(db, "bannedUsers", uid);
+
+          if (banned) {
+            await deleteDoc(banRef);
+          } else {
+            const reason =
+              document.querySelector("#banReason").value.trim() ||
+              "Violation of rules";
+
+            await setDoc(banRef, {
+              uid,
+              username: profile.username || "Unnamed visitor",
+              reason,
+              bannedAt: serverTimestamp()
+            });
+          }
+
+          await loadVisitors();
+
+        } catch (error) {
+          console.error(error);
+          alert("Couldn't update this ban. Check your admin permissions.");
+          action.disabled = false;
+        }
+      });
+
+      card.append(details, action);
+      visitorList.append(card);
+    });
+
+  } catch (error) {
+    console.error(error);
+    visitorList.textContent =
+      "Couldn't load visitors. Check that your administrator email is verified and your Firestore rules are published.";
+  }
+}
+
+document.querySelector("#adminRefresh").addEventListener("click", loadVisitors);
+
+document.querySelector("#adminSignOut").addEventListener("click", async () => {
+  try {
+    await signOut(auth);
+    isAdmin = false;
+    adminModal.hidden = true;
+  } catch (error) {
+    console.error(error);
+    adminMessage.textContent = "Couldn't sign out.";
+  }
+});
