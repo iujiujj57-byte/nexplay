@@ -1,0 +1,222 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08090b">
+  <title>Access Restricted — NexPlay</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: #08090b;
+    }
+
+    .ban-card {
+      width: min(100%, 480px);
+      padding: 35px;
+      border: 1px solid #454b55;
+      border-radius: 22px;
+      background: linear-gradient(145deg, #171a20, #0b0d11);
+      text-align: center;
+      box-shadow: 0 25px 80px #0009;
+    }
+
+    .ban-icon {
+      width: 65px;
+      height: 65px;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 20px;
+      border: 1px solid #555b65;
+      border-radius: 19px;
+      background: #242830;
+      font-size: 29px;
+      filter: grayscale(1);
+    }
+
+    .ban-label {
+      color: #aeb4bd;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+
+    h1 {
+      margin: 12px 0;
+      font: 700 34px 'Space Grotesk', sans-serif;
+      letter-spacing: -1.5px;
+    }
+
+    .ban-description {
+      color: #aeb4bd;
+      line-height: 1.7;
+      font-size: 13px;
+    }
+
+    .ban-info {
+      margin: 25px 0;
+      padding: 16px;
+      border: 1px solid #303640;
+      border-radius: 13px;
+      background: #0a0c10;
+      text-align: left;
+    }
+
+    .ban-info span {
+      display: block;
+      margin-bottom: 6px;
+      color: #777f8b;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .ban-info strong {
+      display: block;
+      color: #e7e9ed;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+
+    .ban-button {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #555d69;
+      border-radius: 11px;
+      background: #252a32;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    #banStatus {
+      color: #9299a4;
+      font-size: 11px;
+      line-height: 1.6;
+      margin-top: 17px;
+    }
+  </style>
+</head>
+<body>
+  <main class="ban-card">
+    <div class="ban-icon">🔒</div>
+    <p class="ban-label">NEXPLAY SECURITY</p>
+    <h1>Access Restricted</h1>
+    <p class="ban-description">
+      This visitor profile has been banned from accessing NexPlay.
+      If you believe this is a mistake, contact the site administrator.
+    </p>
+
+    <div class="ban-info">
+      <span>Ban reason</span>
+      <strong id="banReason">Checking...</strong>
+    </div>
+
+    <div class="ban-info">
+      <span>Ban duration</span>
+      <strong>Until an administrator removes the ban</strong>
+    </div>
+
+    <button id="checkAgain" class="ban-button">Check access again</button>
+    <p id="banStatus">Checking your visitor status...</p>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js";
+    import {
+      getAuth,
+      signInAnonymously,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
+    import {
+      getFirestore,
+      doc,
+      getDoc
+    } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCz7gweuP0E9-jO-uXjbyXMOlWeIHT4Bn8",
+      authDomain: "nexplay-1029b.firebaseapp.com",
+      projectId: "nexplay-1029b",
+      storageBucket: "nexplay-1029b.firebasestorage.app",
+      messagingSenderId: "288990411835",
+      appId: "1:288990411835:web:f1a0697b6c4042fd3eb01e",
+      measurementId: "G-7DKFNYY8L9"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const reasonElement = document.querySelector("#banReason");
+    const statusElement = document.querySelector("#banStatus");
+    const checkButton = document.querySelector("#checkAgain");
+
+    let visitorUid = null;
+
+    async function checkBan() {
+      if (!visitorUid) return;
+
+      try {
+        statusElement.textContent = "Checking your access...";
+
+        const banSnapshot = await getDoc(
+          doc(db, "bannedUsers", visitorUid)
+        );
+
+        if (banSnapshot.exists()) {
+          const banData = banSnapshot.data();
+          reasonElement.textContent =
+            banData.reason || "Violation of rules";
+          statusElement.textContent =
+            "This visitor profile is still banned.";
+        } else {
+          reasonElement.textContent = "No active ban found";
+          statusElement.textContent =
+            "Your access is no longer restricted. You can return to NexPlay.";
+        }
+      } catch (error) {
+        console.error(error);
+        statusElement.textContent =
+          "Couldn't check your status. Please try again.";
+      }
+    }
+
+    onAuthStateChanged(auth, async user => {
+      try {
+        if (!user) {
+          await signInAnonymously(auth);
+          return;
+        }
+
+        visitorUid = user.uid;
+        await checkBan();
+
+      } catch (error) {
+        console.error(error);
+        statusElement.textContent =
+          "Couldn't connect to NexPlay. Please reload the page.";
+      }
+    });
+
+    checkButton.addEventListener("click", async () => {
+      await checkBan();
+
+      if (visitorUid) {
+        const snapshot = await getDoc(
+          doc(db, "bannedUsers", visitorUid)
+        );
+
+        if (!snapshot.exists()) {
+          window.location.href = "index.html";
+        }
+      }
+    });
+  </script>
+</body>
+</html>
