@@ -1,24 +1,11 @@
+
 const sites = [
-  {
-    name: "Games Unblocked",
-    url: "https://games-unblocked.org/",
-    category: "games",
-    icon: "🎮",
-    description: "A big portal of free browser games by genre."
-  },
   {
     name: "Radon Games",
     url: "https://mathclass.vercel.app/",
     category: "games",
     icon: "☢️",
     description: "An open-source unblocked games site."
-  },
-  {
-    name: "Equinox",
-    url: "https://searchequinox.com/",
-    category: "games",
-    icon: "🌗",
-    description: "Games and apps portal. Free to use; skip the paid tier."
   },
   {
     name: "Classic HTML5 Games",
@@ -75,13 +62,6 @@ const sites = [
     category: "games",
     icon: "🌐",
     description: "Puzzles, strategy and casual games."
-  },
-  {
-    name: "Velara",
-    url: "http://velara.cc",
-    category: "games",
-    icon: "V",
-    description: "An external gaming link from your collection."
   },
   {
     name: "Levitr",
@@ -146,8 +126,12 @@ function renderSites() {
   const query = search.value.trim().toLowerCase();
 
   const filtered = sites.filter(site => {
-    const matchesCategory = activeFilter === "all" || site.category === activeFilter;
-    const searchable = `${site.name} ${site.description} ${safeHost(site.url)} ${categoryNames[site.category]}`.toLowerCase();
+    const matchesCategory =
+      activeFilter === "all" || site.category === activeFilter;
+
+    const searchable =
+      `${site.name} ${site.description} ${safeHost(site.url)} ${categoryNames[site.category]}`.toLowerCase();
+
     return matchesCategory && searchable.includes(query);
   });
 
@@ -187,8 +171,19 @@ function renderSites() {
     link.href = site.url;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    link.append(document.createTextNode("Open Website "), Object.assign(document.createElement("span"), { textContent: "→", "aria-hidden": "true" }));
-    link.setAttribute("aria-label", `Open ${site.name} in a new tab`);
+
+    link.append(
+      document.createTextNode("Open Website "),
+      Object.assign(document.createElement("span"), {
+        textContent: "→",
+        "aria-hidden": "true"
+      })
+    );
+
+    link.setAttribute(
+      "aria-label",
+      `Open ${site.name} in a new tab`
+    );
 
     card.append(top, title, tag, description, link);
     grid.append(card);
@@ -196,18 +191,24 @@ function renderSites() {
 
   emptyState.hidden = filtered.length !== 0;
   grid.hidden = filtered.length === 0;
-  resultCount.textContent = `${filtered.length} ${filtered.length === 1 ? "site" : "sites"}`;
+
+  resultCount.textContent =
+    `${filtered.length} ${filtered.length === 1 ? "site" : "sites"}`;
 }
 
 function setFilter(filter) {
   activeFilter = filter;
+
   filterButtons.forEach(button => {
     const isActive = button.dataset.filter === filter;
+
     button.classList.toggle("active", isActive);
+
     if (button.classList.contains("filter-chip")) {
       button.setAttribute("aria-pressed", String(isActive));
     }
   });
+
   renderSites();
 }
 
@@ -222,26 +223,37 @@ document.querySelector("#allCount").textContent = counts.all;
 document.querySelector("#gamesCount").textContent = counts.games;
 document.querySelector("#communityCount").textContent = counts.community;
 document.querySelector("#otherCount").textContent = counts.other;
+
 document.querySelector("#chipAll").textContent = counts.all;
 document.querySelector("#chipGames").textContent = counts.games;
 document.querySelector("#chipCommunity").textContent = counts.community;
 document.querySelector("#chipOther").textContent = counts.other;
+
 document.querySelector("#heroCount").textContent = `${counts.all} Links`;
 document.querySelector("#year").textContent = new Date().getFullYear();
 
 filterButtons.forEach(button => {
-  button.addEventListener("click", () => setFilter(button.dataset.filter));
+  button.addEventListener("click", () => {
+    setFilter(button.dataset.filter);
+  });
 });
+
 search.addEventListener("input", renderSites);
+
 document.querySelector("#resetFilters").addEventListener("click", () => {
   search.value = "";
   setFilter("all");
 });
+
 document.addEventListener("keydown", event => {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    event.key.toLowerCase() === "k"
+  ) {
     event.preventDefault();
     search.focus();
   }
+
   if (event.key === "Escape" && document.activeElement === search) {
     search.value = "";
     renderSites();
