@@ -11,7 +11,7 @@ const firebaseConfig = {
   appId: "1:288990411835:web:f1a0697b6c4042fd3eb01e",
   measurementId: "G-7DKFNYY8L9"
 };
-const ADMIN_EMAIL = "arehq@schools.vic.edu.au";
+const ADMIN_EMAIL = "iujiujj57@gmail.com";
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
